@@ -12,12 +12,118 @@ package ru.yandex.practicum;
 
 не забудьте про специальные типы исключений для игровых и неигровых ошибок
  */
+
+import ru.yandex.practicum.WordleDictionary;
+import ru.yandex.practicum.exception.InvalidWordException;
+import ru.yandex.practicum.exception.AttemptLeftException;
+import ru.yandex.practicum.exception.WordNotFoundExceptions;
+
+import java.io.PrintWriter;
+import java.util.*;
+
 public class WordleGame {
+    private final String secretWord;
+    private int attemptsLeft;
+    private final WordleDictionary dictionary;
+    private final PrintWriter log;
 
-    private String answer;
+    private Set<Character> correctLetters = new HashSet<>();
+    private Set<Character> wrongLetters = new HashSet();
+    private Map<Integer, Character> correctPositions = new HashMap();
+    private Map<Integer, Set<Character>> wrongPositions = new HashMap<>();
+    private List<String> previousAttempts = new ArrayList<>();
 
-    private int steps;
+    public WordleGame(WordleDictionary dictionary, PrintWriter log) {
+        this.attemptsLeft = 6;
+        this.dictionary = dictionary;
+        this.log = log;
+        this.secretWord = dictionary.getRandomWord();
 
-    private WordleDictionary dictionary;
+        for (int i = 0; i < 5; i++) {
+            wrongPositions.put(i, new HashSet<>());
+        }
 
+        log.println("Загаданное слово: " + secretWord);
+    }
+
+    public GameResult makeAttempt(String attempt) throws AttemptLeftException, WordNotFoundExceptions, InvalidWordException {
+        if (attemptsLeft <= 0) {
+            throw new AttemptLeftException();
+        }
+
+        String normalizedAttempt = normalizeWord(attempt);
+
+        if (normalizedAttempt.length() != 5) {
+            throw new InvalidWordException("Слово должно состоять из 5 букв");
+        }
+
+        if (!dictionary.contains(normalizedAttempt)) {
+            throw new WordNotFoundExceptions(attempt);
+        }
+
+        previousAttempts.add(normalizedAttempt);
+        attemptsLeft--;
+
+        if (normalizedAttempt.equals(secretWord)) {
+            return new GameResult(true, "Поздравляем! Вы угадали слово!", attemptsLeft);
+        }
+
+        String hint = generateHint(normalizedAttempt);
+
+        if (attemptsLeft == 0) {
+            return new GameResult(false,
+                    "Игра окончена! Загаданное слово: " + secretWord, attemptsLeft);
+        }
+
+        return new GameResult(false, "Подсказка: " + hint, attemptsLeft);
+    }
+
+    public String getHint() {
+        List<String> possibleWords = dictionary.findPossibleWords(
+                correctLetters, wrongLetters, correctPositions, wrongPositions);
+
+        if (possibleWords.isEmpty()) {
+            return "Нет подходящих слов";
+        }
+
+        Random random = new Random();
+
+        return possibleWords.get(random.nextInt(possibleWords.size()));
+    }
+
+    private String generateHint(String attempt) {
+        StringBuilder  hint = new StringBuilder();
+
+        for (int i = 0; i < 5; i++) {
+            char attemptChar = attempt.charAt(i);
+            char secretChar = secretWord.charAt(i);
+
+            if (attemptChar == secretChar) {
+                hint.append("+");
+            } else if (secretWord.indexOf(attemptChar) != -1) {
+                hint.append("^");
+            } else {
+                hint.append("_");
+            }
+        }
+
+        return hint.toString();
+    }
+
+    public int getAttemptsLeft() {
+        return attemptsLeft;
+    }
+
+    public boolean isGameOver() {
+        return attemptsLeft < 0 || previousAttempts.contains(secretWord);
+    }
+
+    public String getSecretWord() {
+        return secretWord;
+    }
+
+    private String normalizeWord(String word) {
+        return word.toLowerCase()
+                .replace('ё', 'е');
+    }
 }
